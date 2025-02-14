@@ -109,35 +109,33 @@ function App() {
   };
 
   const handleGenerateKling = async (index: number, duration: 5 | 10) => {
-    if (!activeSequence) return;
-    
     try {
-      const videoResult = await generateKlingVideo(
-        activeSequence.dialogues[index] || activeSequence.prompt,
-        activeSequence.images[index],
-        duration
-      );
+      const prompt = activeSequence?.expandedPrompts?.[index] || '';
+      const imageUrl = activeSequence?.images[index] || '';
       
-      setSequences(prevSequences => {
-        return prevSequences.map(seq => {
-          if (seq.id === activeSequence.id) {
-            const newVideoUrls = [...(seq.videoUrls || Array(seq.images.length).fill(null))];
-            const newDurations = [...(seq.videoDurations || Array(seq.images.length).fill(5))];
-            newVideoUrls[index] = videoResult.video.url;
-            newDurations[index] = duration;
-            
-            return {
-              ...seq,
-              videoUrls: newVideoUrls,
-              videoDurations: newDurations
-            };
-          }
-          return seq;
-        });
-      });
+      const result = await generateKlingVideo(prompt, imageUrl, duration);
+      
+      if (activeSequence) {
+        const updatedSequence = { ...activeSequence };
+        if (!updatedSequence.videoUrls) {
+          updatedSequence.videoUrls = Array(updatedSequence.images.length).fill(null);
+        }
+        if (!updatedSequence.videoDurations) {
+          updatedSequence.videoDurations = Array(updatedSequence.images.length).fill(null);
+        }
+        updatedSequence.videoUrls[index] = result.video.url;
+        updatedSequence.videoDurations[index] = duration;
+
+        setSequences(prev =>
+          prev.map(seq =>
+            seq.id === activeSequence.id ? updatedSequence : seq
+          )
+        );
+        setActiveSequence(updatedSequence);
+      }
     } catch (error) {
-      console.error('Error generating kling:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate video. Please try again.');
+      console.error('Error generating Kling video:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred during video generation');
     }
   };
 

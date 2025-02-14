@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trash2, Film, Pencil, Check, X, Play } from 'lucide-react';
+import { RefreshCw, Trash2, Film, Pencil, Check, X, Play, Subtitles, Download } from 'lucide-react';
 import { ModelType } from '../utils/falAi';
 import { TTSLanguage, TTSVoice, voicesByLanguage, languageVoices } from '../utils/types';
 import { TTSPanel } from './TTSPanel';
+import { addCaptionsToVideo } from '../utils/zapcap';
 
 interface Sequence {
   id: string;
@@ -16,6 +17,7 @@ interface Sequence {
   videoUrls?: string[];
   videoDurations?: (5 | 10)[];
   composedVideoUrl?: string;
+  captionedVideoUrl?: string;
 }
 
 interface StoryboardSequenceProps {
@@ -51,6 +53,15 @@ export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateIma
       setSelectedVoice(voices[0]);
     }
   }, [selectedLanguage]);
+
+  // Reset regenerating state when images change
+  useEffect(() => {
+    setRegeneratingIndicesState(new Set());
+  }, [sequence.images]);
+
+  useEffect(() => {
+    setRegeneratingIndicesState(regeneratingIndices);
+  }, [regeneratingIndices]);
 
   const handleRegenerateImage = async (index: number) => {
     if (regeneratingIndicesState.has(index)) return;
@@ -197,7 +208,18 @@ export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateIma
           {sequence.images.map((image, index) => (
             <div key={index} className="space-y-2">
               <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-700">
-                <img src={image} alt={`Generated ${index + 1}`} className="w-full h-full object-cover" />
+                {sequence.videoUrls?.[index] ? (
+                  <video 
+                    src={sequence.videoUrls[index]} 
+                    className="w-full h-full object-cover"
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                  />
+                ) : (
+                  <img src={image} alt={`Generated ${index + 1}`} className="w-full h-full object-cover" />
+                )}
                 <div className="absolute inset-0 flex items-center justify-center">
                   {regeneratingIndicesState.has(index) && (
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -218,6 +240,37 @@ export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateIma
                   >
                     <Film className="w-4 h-4" />
                   </button>
+                  {sequence.videoUrls?.[index] && sequence.audioUrls?.[index] && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const result = await addCaptionsToVideo(sequence.videoUrls![index]);
+                          const updatedSequence = { ...sequence };
+                          if (!updatedSequence.captionedVideoUrl) {
+                            updatedSequence.captionedVideoUrl = result.videoUrl;
+                          }
+                          onUpdateSequence(updatedSequence);
+                        } catch (error) {
+                          console.error('Error adding captions:', error);
+                        }
+                      }}
+                      className="p-1 hover:bg-white/20 rounded disabled:opacity-50"
+                      title="Add captions"
+                      disabled={!sequence.videoUrls?.[index] || !sequence.audioUrls?.[index]}
+                    >
+                      <Subtitles className="w-4 h-4" />
+                    </button>
+                  )}
+                  {sequence.captionedVideoUrl && (
+                    <a
+                      href={sequence.captionedVideoUrl}
+                      download
+                      className="p-1 hover:bg-white/20 rounded"
+                      title="Download video"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
               </div>
               <div className="relative">
