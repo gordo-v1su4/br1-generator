@@ -1,9 +1,13 @@
 import OpenAI from 'openai';
 
+// Create a single instance of OpenAI
 const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
   dangerouslyAllowBrowser: true
 });
+
+// Keep track of in-flight requests
+const pendingRequests = new Map<string, Promise<NarrativeResult>>();
 
 export interface NarrativeResult {
   narrative: string;
@@ -12,47 +16,107 @@ export interface NarrativeResult {
 }
 
 export async function generateNarrative(prompt: string): Promise<NarrativeResult> {
-  const openai = new OpenAI({
-    apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-    dangerouslyAllowBrowser: true
-  });
+  // Check if there's already a pending request for this prompt
+  const existingRequest = pendingRequests.get(prompt);
+  if (existingRequest) {
+    console.log('Using existing request for prompt:', prompt);
+    return existingRequest;
+  }
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [
-      {
-        role: "system",
-        content: `You are a creative narrative generator that creates short, engaging stories optimized for visual storytelling in 5 frames. 
-        For each story, you need to:
-        1. Create a brief narrative (2-3 sentences)
-        2. Break down the narrative into 5 key moments with specific dialogue for each moment
-        3. Generate detailed image prompts for each moment that will help create visually consistent images
-        
-        Format your response as JSON with these fields:
-        - narrative: The overall story (2-3 sentences)
-        - dialogues: Array of 5 dialogue snippets, one for each moment
-        - imagePrompts: Array of 5 detailed image prompts`
-      },
-      {
-        role: "user",
-        content: prompt
+  console.log('Starting new narrative generation for prompt:', prompt);
+  
+  const request = (async () => {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+          {
+            role: "system",
+            content: `You are a creative storyteller. Given a prompt, create a 5-scene narrative with detailed visual descriptions for each scene. 
+            Format the response as JSON with the following structure:
+            {
+              "narrative": "Overall story narrative",
+              "imagePrompts": ["Scene 1 visual description", "Scene 2 visual description", "Scene 3 visual description", "Scene 4 visual description", "Scene 5 visual description"]
+            }
+            Make each scene description vivid and detailed, focusing on visual elements that would work well for image generation.
+            Each scene should flow naturally from one to the next, telling a cohesive story.
+            Keep each scene description under 200 words but make them detailed and specific.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.9,
+        max_tokens: 1000,
+        response_format: { type: "json_object" }
+      });
+
+      console.log('Received response from OpenAI');
+
+      const result = JSON.parse(response.choices[0].message.content || '{}');
+
+      if (!result.narrative || !result.imagePrompts || result.imagePrompts.length !== 5) {
+        throw new Error('Invalid response format from OpenAI');
       }
-    ],
-    temperature: 0.7,
-    response_format: { type: "json_object" }
-  });
 
+      return {
+        narrative: result.narrative,
+        imagePrompts: result.imagePrompts.map(prompt => 
+          `${prompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic`
+        ),
+        dialogues: Array(5).fill('') // Initialize with empty dialogues
+      };
+    } catch (e) {
+      console.error('Failed to generate or parse narrative:', e);
+      throw new Error(e instanceof Error ? e.message : 'Failed to generate narrative');
+    } finally {
+      // Clean up the pending request
+      pendingRequests.delete(prompt);
+    }
+  })();
+
+  // Store the pending request
+  pendingRequests.set(prompt, request);
+  
+  return request;
+}
+
+export async function generateExpandedPrompts(basePrompt: string, narrative: string, count: number): Promise<string[]> {
   try {
-    const result = JSON.parse(response.choices[0].message.content!) as NarrativeResult;
-    return {
-      narrative: result.narrative,
-      dialogues: result.dialogues,
-      imagePrompts: result.imagePrompts.map(prompt => 
-        `${prompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic`
-      )
-    };
-  } catch (e) {
-    console.error('Failed to parse narrative result:', e);
-    throw new Error('Failed to generate narrative');
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: [
+        {
+          role: "system",
+          content: `Given a base prompt and narrative, create ${count} detailed scene descriptions that would work well for image generation.
+          Format the response as JSON with the following structure:
+          {
+            "prompts": ["Scene 1", "Scene 2", "Scene 3", "Scene 4", "Scene 5"]
+          }
+          Each scene should be a detailed visual description that captures a key moment in the story.
+          Focus on visual elements, mood, lighting, and composition.
+          Keep each description under 200 words but make them detailed and specific.`
+        },
+        {
+          role: "user",
+          content: `Base prompt: ${basePrompt}\nNarrative: ${narrative}`
+        }
+      ],
+      temperature: 0.8,
+      max_tokens: 1000,
+      response_format: { type: "json_object" }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || '{}');
+
+    if (!result.prompts || result.prompts.length !== count) {
+      throw new Error('Invalid response format from OpenAI');
+    }
+
+    return result.prompts;
+  } catch (error) {
+    console.error('Error generating expanded prompts:', error);
+    throw error;
   }
 }

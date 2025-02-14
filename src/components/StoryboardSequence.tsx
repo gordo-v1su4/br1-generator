@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { RefreshCw, Trash2, Film, Pencil, Check, X, Play, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { RefreshCw, Trash2, Film, Pencil, Check, X, Play } from 'lucide-react';
 import { ModelType } from '../utils/falAi';
+import { TTSLanguage, TTSVoice, voicesByLanguage, languageVoices } from '../utils/types';
 import { TTSPanel } from './TTSPanel';
 
 interface Sequence {
@@ -38,247 +39,231 @@ export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKlin
   const [editedNarrative, setEditedNarrative] = useState(sequence.narrative);
   const [isNarrativeExpanded, setIsNarrativeExpanded] = useState(false);
   const [editingDialogueIndex, setEditingDialogueIndex] = useState<number | null>(null);
-  const [editedDialogues, setEditedDialogues] = useState<string[]>(sequence.dialogues || []);
+  const [editedPrompts, setEditedPrompts] = useState<string[]>(sequence.expandedPrompts || Array(sequence.images.length).fill(''));
+  const [selectedLanguage, setSelectedLanguage] = useState<TTSLanguage>('american-english');
+  const [selectedVoice, setSelectedVoice] = useState<TTSVoice>('af_nova');
+
+  useEffect(() => {
+    const voices = voicesByLanguage[selectedLanguage];
+    if (voices && voices.length > 0) {
+      setSelectedVoice(voices[0]);
+    }
+  }, [selectedLanguage]);
 
   const handleRegenerateImage = (index: number) => {
     onRegenerateImage(
       index, 
-      editedDialogues[index], 
+      editedPrompts[index] || sequence.dialogues[index],
       sequence.imageSeeds?.[index],
       sequence.expandedPrompts?.[index]
     );
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-4 items-start justify-between">
-        <div className="flex flex-col gap-4 flex-grow">
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-400">Generated with: <span className="border border-gray-600 rounded px-1.5 py-0.5">{selectedModel}</span></div>
-            {isEditing ? (
-              <>
-                <input
-                  type="text"
-                  value={editedPrompt}
-                  onChange={(e) => setEditedPrompt(e.target.value)}
-                  className="bg-gray-800 text-white px-3 py-2 rounded-lg flex-grow"
-                />
-                <button onClick={() => {
-                  onUpdatePrompt(editedPrompt);
-                  onUpdateNarrative(editedNarrative);
-                  setIsEditing(false);
-                }} className="p-2 hover:bg-gray-700 rounded-lg">
-                  <Check className="w-5 h-5" />
-                </button>
-                <button onClick={() => {
-                  setEditedPrompt(sequence.prompt);
-                  setEditedNarrative(sequence.narrative);
-                  setIsEditing(false);
-                }} className="p-2 hover:bg-gray-700 rounded-lg">
-                  <X className="w-5 h-5" />
-                </button>
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-semibold">{sequence.prompt}</h3>
-                <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-gray-700 rounded-lg">
-                  <Pencil className="w-5 h-5" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Collapsible Narrative Section */}
-          <div className="border border-gray-700 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setIsNarrativeExpanded(!isNarrativeExpanded)}
-              className="w-full px-3 py-2 bg-gray-700/50 hover:bg-gray-700 flex items-center justify-between text-sm"
-            >
-              <span>Narrative</span>
-              <svg
-                className={`w-4 h-4 transform transition-transform ${isNarrativeExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {isNarrativeExpanded && (
-              <div className="p-3 bg-gray-700/30">
-                {isEditing ? (
-                  <textarea
-                    value={editedNarrative}
-                    onChange={(e) => setEditedNarrative(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-700 rounded text-sm min-h-[100px] resize-none"
-                    placeholder="Enter narrative..."
-                  />
-                ) : (
-                  <p className="text-sm text-gray-300">{sequence.narrative}</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={onClear}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg"
-          >
-            <Trash2 className="w-5 h-5" />
-            Clear
-          </button>
-          {sequence.videoUrls && sequence.videoUrls.some(url => url !== null) && (
-            <button
-              onClick={async () => {
-                const composedUrl = await onCompose();
-                if (composedUrl) {
-                  window.open(composedUrl, '_blank');
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg"
-            >
-              <Play className="w-5 h-5" />
-              Compose Video
-            </button>
-          )}
-        </div>
+    <div className="border border-gray-700 rounded-lg overflow-hidden bg-gray-800/50 space-y-4 p-4">
+      {/* Clear button at the top */}
+      <div className="flex justify-end">
+        <button
+          onClick={onClear}
+          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+          title="Clear sequence"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="flex gap-4">
-        {/* Left side: Image grid */}
-        <div className="flex-1 grid grid-cols-5 gap-4">
-          {sequence.images.map((image, index) => (
-            <div 
-              key={index} 
-              className="relative flex flex-col gap-2"
-            >
-              <div className="relative aspect-[9/16] bg-gray-800 rounded-lg overflow-hidden">
-                {sequence.videoUrls?.[index] ? (
-                  <video
-                    src={sequence.videoUrls[index] || ''}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
+      {/* Voice and language selectors */}
+      <div className="flex justify-end gap-2">
+        <select
+          value={selectedLanguage}
+          onChange={(e) => setSelectedLanguage(e.target.value as TTSLanguage)}
+          className="px-3 py-1 bg-gray-700 rounded text-sm"
+        >
+          {Object.keys(voicesByLanguage).map((lang) => (
+            <option key={lang} value={lang}>
+              {lang.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={selectedVoice}
+          onChange={(e) => setSelectedVoice(e.target.value as TTSVoice)}
+          className="px-3 py-1 bg-gray-700 rounded text-sm"
+        >
+          {voicesByLanguage[selectedLanguage]?.map((voice) => {
+            const voiceOption = languageVoices.find(v => v.id === voice);
+            return (
+              <option key={voice} value={voice}>
+                {voiceOption?.name || voice.replace(/^[abfgipst][fm]_/, '').split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex gap-4 items-start justify-between">
+          <div className="flex flex-col gap-4 flex-grow">
+            <div className="flex items-center gap-4">
+              <div className="text-xs text-gray-400">Generated with: <span className="border border-gray-600 rounded px-1.5 py-0.5">{selectedModel}</span></div>
+              {isEditing ? (
+                <>
+                  <input
+                    type="text"
+                    value={editedPrompt}
+                    onChange={(e) => setEditedPrompt(e.target.value)}
+                    className="flex-grow px-4 py-2 bg-gray-700 rounded-lg"
+                    placeholder="Enter prompt..."
                   />
-                ) : (
-                  image && (
-                    <img
-                      src={image}
-                      alt={`Frame ${index + 1}`}
-                      className="w-full h-full object-cover"
+                  <button onClick={() => {
+                    onUpdatePrompt(editedPrompt);
+                    setIsEditing(false);
+                  }} className="p-2 hover:bg-gray-700 rounded-lg">
+                    <Check className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => {
+                    setEditedPrompt(sequence.prompt);
+                    setIsEditing(false);
+                  }} className="p-2 hover:bg-gray-700 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-semibold flex-grow">{sequence.prompt}</h3>
+                  <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-gray-700 rounded-lg">
+                    <Pencil className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Collapsible Narrative Section with TTS */}
+            <div className="border border-gray-700 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setIsNarrativeExpanded(!isNarrativeExpanded)}
+                className="w-full px-3 py-2 bg-gray-700/50 hover:bg-gray-700 flex items-center justify-between text-sm"
+              >
+                <span>Narrative</span>
+                <svg
+                  className={`w-4 h-4 transform transition-transform ${isNarrativeExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {isNarrativeExpanded && (
+                <div className="p-3 bg-gray-700/30 space-y-3">
+                  {isEditing ? (
+                    <textarea
+                      value={editedNarrative}
+                      onChange={(e) => setEditedNarrative(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 rounded text-sm min-h-[100px] resize-none"
+                      placeholder="Enter narrative..."
                     />
-                  )
-                )}
-                <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 flex justify-between items-center">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleRegenerateImage(index)}
-                      className="p-1.5 hover:bg-gray-700 rounded-lg"
-                      disabled={regeneratingIndices.has(index)}
-                    >
-                      <RefreshCw className={`w-4 h-4 ${regeneratingIndices.has(index) ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                      onClick={() => onGenerateKling(index, 5)}
-                      className="p-1.5 hover:bg-gray-700 rounded-lg flex items-center"
-                      disabled={regeneratingIndices.has(index)}
-                    >
-                      <Film className="w-4 h-4" />
-                      <span className="text-xs">5s</span>
-                    </button>
-                  </div>
-                  {sequence.videoDurations && sequence.videoDurations[index] && (
-                    <span className="text-xs bg-blue-500 px-1.5 py-0.5 rounded">
-                      {sequence.videoDurations[index]}s
-                    </span>
+                  ) : (
+                    <p className="text-sm text-gray-300">{sequence.narrative}</p>
                   )}
+                  
+                  {/* Narrative TTS Controls */}
+                  <TTSPanel
+                    text={sequence.narrative}
+                    onAudioGenerated={(url) => onUpdateAudio(url, -1)}
+                    initialAudioUrl={sequence.audioUrls?.[0]}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+          </div>
+        </div>
+
+        <div className="grid grid-cols-5 gap-4">
+          {sequence.images.map((image, index) => (
+            <div key={index} className="space-y-2">
+              <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-700">
+                <img src={image} alt={`Generated ${index + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {regeneratingIndices.has(index) && (
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  )}
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 backdrop-blur-sm flex gap-2">
+                  <button
+                    onClick={() => handleRegenerateImage(index)}
+                    className="p-1 hover:bg-white/20 rounded"
+                    title="Regenerate image"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onGenerateKling(index, 5)}
+                    className="p-1 hover:bg-white/20 rounded"
+                    title="Generate video"
+                  >
+                    <Film className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-
-              {/* Dialogue and TTS section */}
-              <div className="space-y-2">
-                {/* Dialogue box */}
-                <div className="relative">
-                  {editingDialogueIndex === index ? (
-                    <div className="flex gap-2">
+              <div className="relative">
+                {editingDialogueIndex === index ? (
+                  <div className="space-y-2">
+                    <div className="min-h-[3rem] px-3 py-2 text-sm bg-gray-700 rounded">
+                      <div className="font-medium mb-1">Prompt:</div>
+                      <div className="text-gray-300 text-sm">{editedPrompts[index]}</div>
+                    </div>
+                    <div className="min-h-[4rem] px-3 py-2 text-sm bg-gray-700/50 rounded">
+                      <div className="font-medium mb-1">Dialogue:</div>
                       <textarea
-                        value={editedDialogues[index]}
+                        value={sequence.dialogues[index] || ''}
                         onChange={(e) => {
-                          const newDialogues = [...editedDialogues];
-                          newDialogues[index] = e.target.value;
-                          setEditedDialogues(newDialogues);
+                          // Limit dialogue to roughly what can be spoken in 5 seconds
+                          const text = e.target.value;
+                          if (text.split(' ').length <= 15) { // Average person speaks ~3 words/second
+                            onUpdateDialogue(index, text);
+                          }
                         }}
-                        className="w-full px-2 py-1 bg-gray-700 rounded text-sm min-h-[60px] resize-none"
-                        placeholder="Enter dialogue..."
+                        className="w-full h-12 bg-transparent resize-none focus:outline-none"
+                        placeholder="Enter a short dialogue (max 15 words)..."
                       />
-                      <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => {
-                            onUpdateDialogue(index, editedDialogues[index]);
-                            setEditingDialogueIndex(null);
-                          }}
-                          className="p-1 hover:bg-gray-700 rounded"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditedDialogues(sequence.dialogues);
-                            setEditingDialogueIndex(null);
-                          }}
-                          className="p-1 hover:bg-gray-700 rounded"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="group relative bg-gray-700 p-2 rounded text-sm">
-                      {sequence.dialogues?.[index]}
-                      <button
-                        onClick={() => setEditingDialogueIndex(index)}
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
+                    <TTSPanel
+                      text={sequence.dialogues[index] || ''}
+                      voice={selectedVoice}
+                      onAudioGenerated={(url) => onUpdateAudio(url, index)}
+                      initialAudioUrl={sequence.audioUrls?.[index]}
+                    />
+                  </div>
+                ) : (
+                  <div 
+                    onClick={() => setEditingDialogueIndex(index)}
+                    className="space-y-2"
+                  >
+                    <div className="min-h-[3rem] px-3 py-2 text-sm bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
+                      <div className="font-medium mb-1">Prompt:</div>
+                      <div className="text-gray-300 text-sm">{editedPrompts[index]}</div>
                     </div>
-                  )}
-                </div>
-
-                {/* Individual TTS Panel */}
-                <TTSPanel
-                  text={sequence.dialogues?.[index] || ''}
-                  onAudioGenerated={(url) => onUpdateAudio(url, index)}
-                  initialAudioUrl={sequence.audioUrls?.[index]}
-                />
+                    <div className="min-h-[4rem] px-3 py-2 text-sm bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
+                      <div className="font-medium mb-1">Dialogue:</div>
+                      <div className="text-gray-300 text-sm">{sequence.dialogues[index] || ''}</div>
+                    </div>
+                    <TTSPanel
+                      text={sequence.dialogues[index] || ''}
+                      voice={selectedVoice}
+                      onAudioGenerated={(url) => onUpdateAudio(url, index)}
+                      initialAudioUrl={sequence.audioUrls?.[index]}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ))}
-          {/* Final Video Placeholder */}
-          <div className="relative aspect-[9/16] bg-gray-800/50 rounded-lg overflow-hidden">
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <Film className="w-8 h-8 text-gray-600" />
-              <span className="text-sm text-gray-500">Final Video</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right side: Composition Section */}
-        <div className="flex flex-col gap-4">
-          {sequence.videoUrls?.some(url => url) && sequence.audioUrls?.some(url => url) && (
-            <button
-              onClick={onComposeVideo}
-              className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2"
-            >
-              <Film className="w-5 h-5" />
-              <span>Compose Videos and Audio</span>
-            </button>
-          )}
         </div>
       </div>
     </div>

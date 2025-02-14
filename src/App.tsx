@@ -1,8 +1,11 @@
-import { useState, useEffect, Component } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { StoryboardPrompt } from './components/StoryboardPrompt';
 import { StoryboardSequence } from './components/StoryboardSequence';
 import { ModelSelector } from './components/ModelSelector';
-import { generateImages, generateSingleImage, ModelType } from './utils/falAi';
+import { generateSequence, ModelType } from './utils/falAi';
+import { generateNarrative } from './utils/narrativeGenerator';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { generateImages, generateSingleImage } from './utils/falAi';
 import { generateKlingVideo } from './utils/klingVideo';
 import { composeVideoWithAudio } from './utils/ffmpegCompose';
 
@@ -20,39 +23,15 @@ interface Sequence {
   expandedPrompts?: string[];
 }
 
-class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-gray-900 text-gray-300 p-8">
-          <h1 className="text-2xl font-bold text-red-500 mb-4">Something went wrong</h1>
-          <pre className="bg-gray-800 p-4 rounded">{this.state.error?.message}</pre>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
 function App() {
-  console.log('App component rendering...'); // Debug log
-
   const [sequences, setSequences] = useState<Sequence[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('realistic-vision');
   const [regeneratingIndices, setRegeneratingIndices] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [activeSequence, setActiveSequence] = useState<Sequence | null>(null);
+  const [prompt, setPrompt] = useState('');
 
   useEffect(() => {
     // Check if environment variables are loaded
@@ -62,111 +41,84 @@ function App() {
     });
   }, []);
 
-  const handleGenerateSequence = async (prompt: string, narrative: string, dialogues: string[], imagePrompts: string[]) => {
-    console.log('Generating sequence with:', { prompt, narrative, dialogues, imagePrompts }); // Debug log
-    setIsLoading(true);
+  const handleGenerate = async () => {
+    if (!prompt || isGenerating) return;
+
+    setIsGenerating(true);
     setError(null);
-    
+    setActiveSequence(null);
+
     try {
-      const images = await Promise.all(imagePrompts.map(prompt => generateImages(prompt, selectedModel)));
-      console.log('Generated images:', images); // Debug log
+      // Generate the narrative first
+      const narrativeResult = await generateNarrative(prompt);
       
+      // Generate 5 expanded prompts
+      const expandedPrompts = narrativeResult.imagePrompts;
+      
+      // Generate all 5 images in parallel
+      const imagePromises = expandedPrompts.map(expandedPrompt => 
+        generateSingleImage(expandedPrompt, selectedModel)
+      );
+
+      const images = await Promise.all(imagePromises);
+
+      // Create initial sequence with empty dialogues
       const newSequence: Sequence = {
-        id: window.crypto.randomUUID(),
+        id: Date.now().toString(),
         prompt,
-        narrative,
-        dialogues,
-        images: images.flat(),
-        audioUrls: new Array(images.flat().length).fill(null)
+        narrative: narrativeResult.narrative,
+        expandedPrompts,
+        images,
+        dialogues: Array(5).fill(''),
+        audioUrls: Array(5).fill(null)
       };
-      setSequences(prevSequences => [newSequence, ...prevSequences]);
+
+      setSequences(prev => [newSequence, ...prev]);
       setActiveSequence(newSequence);
+      setPrompt('');
     } catch (error) {
-      console.error('Error generating sequence:', error);
-      setError('Failed to generate images. Please try again.');
-      alert('Failed to generate images. Please try again.');
+      console.error('Generation error:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred during generation');
     } finally {
+      setIsGenerating(false);
       setIsLoading(false);
     }
   };
 
   const handleRegenerateImage = async (index: number, prompt: string, seed?: number, expandedPrompt?: string) => {
-    if (!activeSequence) return;
-
-    setRegeneratingIndices(prev => new Set(prev.add(index)));
     try {
-      const result = await generateSingleImage({
-        prompt,
-        seed,
-        expandedPrompt,
-        modelType: selectedModel
-      });
+      setRegeneratingIndices(prev => new Set([...prev, index]));
+      const newImageUrl = await generateSingleImage(prompt, selectedModel);
 
-      setSequences(prev => prev.map(seq => {
-        if (seq.id === activeSequence.id) {
-          const newImages = [...seq.images];
-          const newSeeds = [...(seq.imageSeeds || [])];
-          const newExpandedPrompts = [...(seq.expandedPrompts || [])];
-          
-          newImages[index] = result.imageUrl;
-          newSeeds[index] = result.seed;
-          newExpandedPrompts[index] = result.expandedPrompt;
-          
-          return {
-            ...seq,
-            images: newImages,
-            imageSeeds: newSeeds,
-            expandedPrompts: newExpandedPrompts
-          };
-        }
-        return seq;
-      }));
+      setSequences(prev =>
+        prev.map(seq =>
+          seq.id === activeSequence?.id
+            ? {
+                ...seq,
+                images: seq.images.map((img, i) => (i === index ? newImageUrl : img)),
+              }
+            : seq
+        )
+      );
     } catch (error) {
       console.error('Error regenerating image:', error);
-      setError('Failed to regenerate image. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to regenerate image. Please try again.');
     } finally {
-      setRegeneratingIndices(prev => {
-        const next = new Set(prev);
-        next.delete(index);
-        return next;
-      });
+      setRegeneratingIndices(prev => new Set([...prev].filter(i => i !== index)));
     }
   };
 
-  const handleUpdateDialogue = (sequenceId: string, index: number, dialogue: string) => {
-    setSequences(prev => prev.map(seq => {
-      if (seq.id === sequenceId) {
-        const newDialogues = [...seq.dialogues];
-        newDialogues[index] = dialogue;
-        return {
-          ...seq,
-          dialogues: newDialogues
-        };
-      }
-      return seq;
-    }));
-  };
-
-  const handleGenerateKling = async (sequenceId: string, index: number, duration: 5 | 10) => {
-    setRegeneratingIndices(prev => new Set(prev).add(index));
-
+  const handleGenerateKling = async (index: number, duration: 5 | 10) => {
+    if (!activeSequence) return;
+    
     try {
-      const sequence = sequences.find(seq => seq.id === sequenceId);
-      if (!sequence) throw new Error('Sequence not found');
-      if (!sequence.images[index]) throw new Error('No image found at index');
-
-      const result = await generateKlingVideo(
-        sequence.prompt,
-        sequence.images[index],
-        duration
-      );
-      
+      const videoUrl = await generateKlingVideo(activeSequence.images[index], duration);
       setSequences(prevSequences => {
         return prevSequences.map(seq => {
-          if (seq.id === sequenceId) {
+          if (seq.id === activeSequence.id) {
             const newVideoUrls = [...(seq.videoUrls || Array(seq.images.length).fill(null))];
             const newDurations = [...(seq.videoDurations || Array(seq.images.length).fill(5))];
-            newVideoUrls[index] = result.video.url;
+            newVideoUrls[index] = videoUrl;
             newDurations[index] = duration;
             
             return {
@@ -179,29 +131,79 @@ function App() {
         });
       });
     } catch (error) {
-      console.error('Error generating video:', error);
-      alert('Failed to generate video. Please try again.');
-    } finally {
-      setRegeneratingIndices(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(index);
-        return newSet;
-      });
+      console.error('Error generating kling:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate video. Please try again.');
     }
   };
 
   const handleUpdateAudio = (audioUrl: string, index: number) => {
-    setSequences(prev => prev.map(seq => {
-      if (seq.id === activeSequence?.id) {
-        const newAudioUrls = [...(seq.audioUrls || new Array(seq.images.length).fill(null))];
-        newAudioUrls[index] = audioUrl;
-        return {
-          ...seq,
-          audioUrls: newAudioUrls
-        };
-      }
-      return seq;
-    }));
+    if (!activeSequence) return;
+    setSequences(prevSequences => {
+      return prevSequences.map(seq => {
+        if (seq.id === activeSequence.id) {
+          const newAudioUrls = [...(seq.audioUrls || new Array(seq.images.length).fill(null))];
+          newAudioUrls[index] = audioUrl;
+          return {
+            ...seq,
+            audioUrls: newAudioUrls
+          };
+        }
+        return seq;
+      });
+    });
+  };
+
+  const handleUpdateDialogue = (index: number, dialogue: string) => {
+    if (!activeSequence) return;
+    setSequences(prevSequences => {
+      return prevSequences.map(seq => {
+        if (seq.id === activeSequence.id) {
+          const newDialogues = [...seq.dialogues];
+          newDialogues[index] = dialogue;
+          return {
+            ...seq,
+            dialogues: newDialogues
+          };
+        }
+        return seq;
+      });
+    });
+  };
+
+  const handleClearSequence = () => {
+    if (!activeSequence) return;
+    setSequences(prev => prev.filter(seq => seq.id !== activeSequence.id));
+    setActiveSequence(null);
+  };
+
+  const handleUpdatePrompt = async (newPrompt: string) => {
+    if (!activeSequence) return;
+    setSequences(prevSequences => {
+      return prevSequences.map(seq => {
+        if (seq.id === activeSequence.id) {
+          return {
+            ...seq,
+            prompt: newPrompt
+          };
+        }
+        return seq;
+      });
+    });
+  };
+
+  const handleUpdateNarrative = async (narrative: string) => {
+    if (!activeSequence) return;
+    setSequences(prevSequences => {
+      return prevSequences.map(seq => {
+        if (seq.id === activeSequence.id) {
+          return {
+            ...seq,
+            narrative
+          };
+        }
+        return seq;
+      });
+    });
   };
 
   const handleComposeVideo = async () => {
@@ -215,64 +217,45 @@ function App() {
     // This will need to be handled by your video composition service
   };
 
-  const handleClearSequence = (id: string) => {
-    setSequences(sequences.filter(seq => seq.id !== id));
-  };
-
-  const handleUpdatePrompt = async (id: string, prompt: string) => {
-    const sequence = sequences.find(seq => seq.id === id);
-    if (!sequence) return;
-
-    setSequences(
-      sequences.map(seq =>
-        seq.id === id ? { ...seq, prompt } : seq
-      )
-    );
-  };
-
-  const handleUpdateNarrative = async (id: string, narrative: string) => {
-    const sequence = sequences.find(seq => seq.id === id);
-    if (!sequence) return;
-
-    setSequences(
-      sequences.map(seq =>
-        seq.id === id ? { ...seq, narrative } : seq
-      )
-    );
-  };
+  const renderSequence = useCallback((sequence: Sequence) => (
+    <StoryboardSequence
+      key={sequence.id}
+      sequence={sequence}
+      onRegenerateImage={handleRegenerateImage}
+      onGenerateKling={handleGenerateKling}
+      onUpdateAudio={handleUpdateAudio}
+      onClear={handleClearSequence}
+      onUpdatePrompt={handleUpdatePrompt}
+      onUpdateNarrative={handleUpdateNarrative}
+      onUpdateDialogue={handleUpdateDialogue}
+      onCompose={handleComposeVideo}
+      regeneratingIndices={regeneratingIndices}
+      selectedModel={selectedModel}
+    />
+  ), [handleRegenerateImage, handleGenerateKling, handleUpdateAudio, handleClearSequence, 
+      handleUpdatePrompt, handleUpdateNarrative, handleUpdateDialogue, 
+      handleComposeVideo, regeneratingIndices, selectedModel]);
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-900 text-gray-300">
-        <div className="max-w-[1400px] mx-auto p-8">
-          <h1 className="text-4xl font-bold mb-8 mt-[5px] tracking-wide bg-[length:200%_auto] bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-transparent bg-clip-text animate-gradient">
-            BRAINROT SEQUENCE GENERATOR
-          </h1>
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
           {error && (
-            <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-2 rounded-lg mb-4">
+            <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded-lg">
               {error}
             </div>
           )}
           <div className="space-y-4">
             <ModelSelector selectedModel={selectedModel} onModelSelect={setSelectedModel} />
-            <StoryboardPrompt onGenerate={handleGenerateSequence} isLoading={isLoading} />
+            <StoryboardPrompt 
+              onGenerate={handleGenerate} 
+              isLoading={isLoading} 
+              isGenerating={isGenerating} 
+              prompt={prompt} 
+              setPrompt={setPrompt} 
+            />
             <div className="space-y-4">
-              {sequences.map(sequence => (
-                <StoryboardSequence
-                  key={sequence.id}
-                  sequence={sequence}
-                  onRegenerateImage={(index, prompt, seed, expandedPrompt) => handleRegenerateImage(index, prompt, seed, expandedPrompt)}
-                  onGenerateKling={(index, duration) => handleGenerateKling(sequence.id, index, duration)}
-                  onUpdateAudio={(audioUrl, index) => handleUpdateAudio(audioUrl, index)}
-                  onUpdateDialogue={(index, dialogue) => handleUpdateDialogue(sequence.id, index, dialogue)}
-                  onClear={() => handleClearSequence(sequence.id)}
-                  onUpdatePrompt={(prompt) => handleUpdatePrompt(sequence.id, prompt)}
-                  onUpdateNarrative={(narrative) => handleUpdateNarrative(sequence.id, narrative)}
-                  onCompose={() => handleComposeVideo()}
-                  regeneratingIndices={regeneratingIndices}
-                  selectedModel={selectedModel}
-                />
-              ))}
+              {sequences.map(renderSequence)}
             </div>
           </div>
         </div>

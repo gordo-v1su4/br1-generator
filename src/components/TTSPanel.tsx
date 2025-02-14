@@ -1,111 +1,65 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { TTSLanguage, TTSVoice, voicesByLanguage } from '../utils/types';
+import React, { useState, useEffect } from 'react';
 import { generateTTS } from '../utils/tts';
+import { TTSVoice } from '../utils/types';
+import { Play, Loader2 } from 'lucide-react';
 
 interface TTSPanelProps {
   onAudioGenerated: (url: string) => void;
   initialAudioUrl?: string;
+  text?: string;
+  voice?: TTSVoice;
 }
 
-export const TTSPanel: React.FC<TTSPanelProps> = ({ onAudioGenerated, initialAudioUrl }) => {
-  const [text, setText] = useState('');
-  const [language, setLanguage] = useState<TTSLanguage>('american-english');
-  const [selectedVoice, setSelectedVoice] = useState<TTSVoice>('af_nova');
+export function TTSPanel({ onAudioGenerated, initialAudioUrl, text = '', voice = 'af_nova' }: TTSPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [audioUrl, setAudioUrl] = useState(initialAudioUrl);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(initialAudioUrl);
 
-  // Get available voices for the selected language
-  const voices = useMemo(() => {
-    return (voicesByLanguage[language] || []).map(voiceId => ({
-      id: voiceId,
-      label: voiceId
-        .replace(/^[abfgipst][fm]_/, '')
-        .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')
-    }));
-  }, [language]);
-
-  // Update selected voice when language changes
   useEffect(() => {
-    if (voices.length > 0) {
-      setSelectedVoice(voices[0].id);
+    if (initialAudioUrl) {
+      setAudioUrl(initialAudioUrl);
     }
-  }, [language, voices]);
-
-  // Update audio URL when initialAudioUrl changes
-  useEffect(() => {
-    setAudioUrl(initialAudioUrl);
   }, [initialAudioUrl]);
 
-  const handleGenerate = async () => {
-    if (!text.trim()) return;
-    setIsGenerating(true);
+  const handleGenerateTTS = async () => {
+    if (!text) return;
     
     try {
-      const url = await generateTTS(text, selectedVoice, (msg) => {
-        console.log('Progress:', msg);
+      setIsGenerating(true);
+      const url = await generateTTS(text, voice, (progress) => {
+        console.log('TTS Progress:', progress);
       });
       setAudioUrl(url);
       onAudioGenerated(url);
     } catch (error) {
-      console.error('Failed to generate audio:', error);
+      console.error('Error generating TTS:', error);
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-2 items-start">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="flex-1 h-20 px-2 py-1 bg-gray-700 text-white rounded-md text-sm resize-none"
-          placeholder="Enter narration text..."
-          disabled={isGenerating}
-        />
-        <div className="flex flex-col gap-2">
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as TTSLanguage)}
-            className="w-32 px-2 py-1 bg-gray-700 text-white rounded-md text-sm"
-            disabled={isGenerating}
-          >
-            {Object.keys(voicesByLanguage).map((lang) => (
-              <option key={lang} value={lang}>
-                {lang.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedVoice}
-            onChange={(e) => setSelectedVoice(e.target.value as TTSVoice)}
-            className="w-32 px-2 py-1 bg-gray-700 text-white rounded-md text-sm"
-            disabled={isGenerating}
-          >
-            {voices.map((voice) => (
-              <option key={voice.id} value={voice.id}>
-                {voice.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating || !text.trim()}
-            className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isGenerating ? 'Generating...' : 'Generate'}
-          </button>
-        </div>
-      </div>
-      {audioUrl && (
-        <audio 
-          src={audioUrl} 
-          controls 
-          className="w-full mt-2"
-        />
+    <div className="flex items-center gap-2">
+      {audioUrl ? (
+        <audio src={audioUrl} controls className="w-full h-6" />
+      ) : (
+        <button
+          onClick={handleGenerateTTS}
+          disabled={isGenerating || !text}
+          className="flex items-center gap-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <Play className="w-3 h-3" />
+              <span>Generate Voice</span>
+            </>
+          )}
+        </button>
       )}
     </div>
   );
-};
+}

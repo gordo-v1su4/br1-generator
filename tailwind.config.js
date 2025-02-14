@@ -32,12 +32,17 @@ export default {
           '100%': {
             'background-position': '0% 50%'
           }
+        },
+        'progress-bar': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' }
         }
       },
       animation: {
-        'progress-infinite': 'progress-infinite 2s ease-in-out infinite',
-        'fill-gradient': 'fill-gradient 1s ease-out forwards',
-        'gradient': 'gradient 1s ease infinite'
+        'gradient': 'gradient 15s ease infinite',
+        'progress-infinite': 'progress-infinite 2s linear infinite',
+        'fill-gradient': 'fill-gradient 2s ease-out forwards',
+        'progress-bar': 'progress-bar 2s ease-in-out infinite'
       }
     },
   },

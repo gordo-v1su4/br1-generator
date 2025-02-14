@@ -178,85 +178,28 @@ interface ImageGenerationParams {
   modelType?: ModelType;
 }
 
-export async function generateImage({ prompt, expandedPrompt, seed, modelType = 'realistic-vision' }: ImageGenerationParams): Promise<{ imageUrl: string, seed: number, expandedPrompt: string | undefined }> {
-  const client = fal;
-
-  // Use or generate a seed
-  const useSeed = seed || Math.floor(Math.random() * 1000000);
-
-  // Combine prompt with expanded prompt if available
-  const fullPrompt = expandedPrompt ? 
-    `${prompt}, ${expandedPrompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic` :
-    `${prompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic`;
-
-  try {
-    const result = await client.subscribe("110602490-lcm", {
-      input: {
-        prompt: fullPrompt,
-        seed: useSeed,
-        image_size: "512x912",
-        sync_mode: true
-      }
-    });
-
-    // Store the seed with the result
-    return {
-      imageUrl: result.data.image.url,
-      seed: useSeed,
-      expandedPrompt: expandedPrompt
-    };
-  } catch (error) {
-    console.error('Error generating image:', error);
-    throw error;
-  }
+interface ImageGenerationResult {
+  image: {
+    url: string;
+  };
+  seed: number;
 }
 
-// Generate a sequence of images
-export async function generateSequence(prompt: string, modelType: ModelType = 'realistic-vision'): Promise<string[]> {
+export async function generateSingleImage(
+  prompt: string,
+  model: ModelType = 'realistic-vision',
+  seed?: number
+): Promise<string> {
   try {
-    const modelInfo = MODELS.find(m => m.id === modelType);
+    const modelInfo = MODELS.find(m => m.id === model);
     if (!modelInfo) throw new Error('Invalid model type');
 
     const config = {
       ...modelInfo.defaultConfig,
-      prompt: modelType === 'anime-lora' ? `Juaner_cartoon, ${prompt}` : prompt,
+      prompt: model === 'anime-lora' ? `Juaner_cartoon, ${prompt}` : prompt,
     };
 
-    const modelEndpoint = modelType === 'flux-pro' ? 'fal-ai/flux-pro/v1.1-ultra' : 'fal-ai/flux-lora';
-    const result = await fal.subscribe(modelEndpoint, {
-      input: config as any,
-      onQueueUpdate: (update) => {
-        if (update.status === "IN_PROGRESS") {
-          console.log(`Generation in progress...`);
-          update.logs?.forEach(log => console.log(log.message));
-        }
-      },
-    });
-
-    if (!result.data?.images) {
-      throw new Error('No images were generated');
-    }
-
-    return result.data.images.map((image: any) => image.url);
-  } catch (error) {
-    console.error('Error generating images:', error);
-    throw error;
-  }
-}
-
-// Generate a single replacement image
-export async function generateSingleImage(prompt: string, modelType: ModelType = 'realistic-vision'): Promise<string> {
-  try {
-    const modelInfo = MODELS.find(m => m.id === modelType);
-    if (!modelInfo) throw new Error('Invalid model type');
-
-    const config = {
-      ...modelInfo.defaultConfig,
-      num_images: 1,
-      prompt: modelType === 'anime-lora' ? `Juaner_cartoon, ${prompt}` : prompt,
-    };
-
-    const modelEndpoint = modelType === 'flux-pro' ? 'fal-ai/flux-pro/v1.1-ultra' : 'fal-ai/flux-lora';
+    const modelEndpoint = model === 'flux-pro' ? 'fal-ai/flux-pro/v1.1-ultra' : 'fal-ai/flux-lora';
     const result = await fal.subscribe(modelEndpoint, {
       input: config as any,
       onQueueUpdate: (update) => {
@@ -273,7 +216,29 @@ export async function generateSingleImage(prompt: string, modelType: ModelType =
 
     return result.data.images[0].url;
   } catch (error) {
-    console.error('Error generating single image:', error);
+    console.error('Error generating image:', error);
+    throw error;
+  }
+}
+
+export async function generateSequence(
+  basePrompt: string,
+  model: ModelType = 'realistic-vision',
+  count: number = 5
+): Promise<{ images: string[]; seeds: number[] }> {
+  try {
+    const imagePromises = Array(count).fill(null).map(() => 
+      generateSingleImage(basePrompt, model)
+    );
+
+    const images = await Promise.all(imagePromises);
+
+    return {
+      images,
+      seeds: Array(count).fill(0) // For now, we're not tracking seeds
+    };
+  } catch (error) {
+    console.error('Error generating image sequence:', error);
     throw error;
   }
 }
