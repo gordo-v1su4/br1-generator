@@ -14,11 +14,13 @@ export function ModelSelector({ selectedModel, onModelSelect }: ModelSelectorPro
           onClick={() => onModelSelect(model.id)}
           className={`relative group flex flex-col items-center p-4 rounded-lg transition-all ${
             selectedModel === model.id
-              ? 'bg-blue-500/20 ring-2 ring-blue-500'
+              ? 'bg-blue-500/20 ring-2 ring-blue-500 border-2 border-blue-400'
               : 'bg-gray-800 hover:bg-gray-700'
           }`}
         >
-          <div className="w-32 h-32 rounded-lg overflow-hidden mb-2">
+          <div className={`w-32 h-32 rounded-lg overflow-hidden mb-2 ${
+            selectedModel === model.id ? 'ring-2 ring-blue-400' : ''
+          }`}>
             <img
               src={model.previewImage}
               alt={`${model.name} preview`}
@@ -30,10 +32,10 @@ export function ModelSelector({ selectedModel, onModelSelect }: ModelSelectorPro
           
           {/* Highlight overlay */}
           <div
-            className={`absolute inset-0 rounded-lg ring-2 transition-opacity ${
+            className={`absolute inset-0 rounded-lg transition-opacity ${
               selectedModel === model.id
-                ? 'ring-blue-500 opacity-100'
-                : 'ring-blue-500 opacity-0 group-hover:opacity-50'
+                ? 'ring-4 ring-blue-500 opacity-100'
+                : 'ring-2 ring-blue-500 opacity-0 group-hover:opacity-50'
             }`}
           />
         </button>

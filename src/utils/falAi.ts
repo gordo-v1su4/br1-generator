@@ -2,7 +2,7 @@ import { fal } from "@fal-ai/client";
 
 // Initialize fal client with API key
 fal.config({
-  credentials: import.meta.env.VITE_FAL_AI_API_KEY,
+  credentials: import.meta.env.VITE_FAL_API_KEY,
 });
 
 // Common types
@@ -62,7 +62,7 @@ export interface FluxLoraConfig extends BaseModelConfig {
   }>;
 }
 
-export type ModelType = 'realistic-vision' | 'flux-pro' | 'flux-lora' | 'anime-lora';
+export type ModelType = 'amateur-photography' | 'realistic-vision' | 'flux-pro' | 'flux-lora' | 'anime-lora';
 
 export interface ModelInfo {
   id: ModelType;
@@ -74,6 +74,25 @@ export interface ModelInfo {
 
 // Model configurations
 export const MODELS: ModelInfo[] = [
+  {
+    id: 'amateur-photography',
+    name: 'Amateur Photography [Flux Dev]',
+    description: 'Casual and authentic photography style with natural lighting and composition',
+    previewImage: '/assets/model-previews/flux-amateur-photography.png',
+    defaultConfig: {
+      num_images: 2,
+      enable_safety_checker: false,
+      safety_tolerance: "5",
+      output_format: "png",
+      aspect_ratio: "9:16",
+      sync_mode: false,
+      raw: true,
+      image_size: "portrait_16_9",
+      num_inference_steps: 35,
+      guidance_scale: 6.5,
+      negative_prompt: "(worst quality, low quality, normal quality, lowres, low details, oversaturated, undersaturated, overexposed, underexposed, grayscale, bw, bad photo, bad photography, bad art:1.4), (watermark, signature, text font, username, error, logo, words, letters, digits, autograph, trademark, name:1.2), (blur, blurry, grainy), morbid, ugly, asymmetrical, mutated malformed, mutilated, poorly lit, bad shadow, draft, cropped, out of frame, cut off, censored, jpeg artifacts, out of focus, glitch, duplicate, (airbrushed, cartoon, anime, semi-realistic, cgi, render, blender, digital art, manga:1.3)"
+    }
+  },
   {
     id: 'realistic-vision',
     name: 'Realistic Vision',
@@ -151,6 +170,46 @@ export const MODELS: ModelInfo[] = [
     }
   }
 ];
+
+interface ImageGenerationParams {
+  prompt: string;
+  expandedPrompt?: string;
+  seed?: number;
+  modelType?: ModelType;
+}
+
+export async function generateImage({ prompt, expandedPrompt, seed, modelType = 'realistic-vision' }: ImageGenerationParams): Promise<{ imageUrl: string, seed: number, expandedPrompt: string | undefined }> {
+  const client = fal;
+
+  // Use or generate a seed
+  const useSeed = seed || Math.floor(Math.random() * 1000000);
+
+  // Combine prompt with expanded prompt if available
+  const fullPrompt = expandedPrompt ? 
+    `${prompt}, ${expandedPrompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic` :
+    `${prompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic`;
+
+  try {
+    const result = await client.subscribe("110602490-lcm", {
+      input: {
+        prompt: fullPrompt,
+        seed: useSeed,
+        image_size: "512x912",
+        sync_mode: true
+      }
+    });
+
+    // Store the seed with the result
+    return {
+      imageUrl: result.data.image.url,
+      seed: useSeed,
+      expandedPrompt: expandedPrompt
+    };
+  } catch (error) {
+    console.error('Error generating image:', error);
+    throw error;
+  }
+}
 
 // Generate a sequence of images
 export async function generateSequence(prompt: string, modelType: ModelType = 'realistic-vision'): Promise<string[]> {
