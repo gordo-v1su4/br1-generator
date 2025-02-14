@@ -1,111 +1,70 @@
-# AI Storyboard Generator
+# AI Image & Video Generation Platform
 
-This template provides a minimal setup to get AI-powered storyboard generation working in Vite with React and TypeScript.
+![Preview](public/assets/previews/UI_part1.PNG)
 
-## 🔐 API Key Setup (Important!)
+## 🌟 Features
 
-1. Sign up for a FAL.ai account at https://fal.ai
-2. Get your API key from the FAL.ai dashboard
-3. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-4. Add your API key to `.env`:
-   ```
-   VITE_FAL_AI_API_KEY=your_fal_ai_api_key_here
-   ```
+### Image Generation
+- Generate sequences of AI-powered images
+- Multiple model support (SDXL, etc.)
+- Real-time image regeneration
+- Dynamic prompt-based generation
+- Beautiful transparent UI controls
 
-⚠️ **Security Warnings:**
-- NEVER commit your `.env` file
-- NEVER share your API key
-- NEVER push your API key to public repositories
-- The `.env` file is already in `.gitignore`
+### Video Generation (New!)
+- Transform any generated image into dynamic videos
+- Powered by FAL.ai Kling Video 1.6 Pro
+- Choose between 5s and 10s video durations
+- Seamless video playback integration
+- Real-time progress updates
 
-## Expanding the ESLint configuration
+### User Interface
+- Clean, modern design with transparent overlays
+- Intuitive image and video controls
+- Loading states and progress feedback
+- Responsive layout
+- Dark mode optimized
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## 🚀 Getting Started
 
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
-
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
-
-## Scripts
-
+1. Clone the repository
 ```bash
-# Install dependencies
+git clone [repository-url]
+```
+
+2. Install dependencies
+```bash
 npm install
+```
 
-# Start development server
+3. Set up environment variables
+Create a `.env` file with:
+```
+VITE_FAL_API_KEY=your-fal-ai-key
+```
+
+4. Start the development server
+```bash
 npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run ESLint
-npm run lint
 ```
 
-## Features
+## 🛠️ Tech Stack
+- React + TypeScript
+- Vite
+- FAL.ai API
+- TailwindCSS
+- React Icons
 
-- ⚡️ React + TypeScript + Vite
-- 🎨 Tailwind CSS for styling
-- 🤖 FAL.ai Realistic Vision model integration
-- 📱 Responsive design
-- 🖼️ 720x1280 (9:16) image generation
-- 🔄 Individual image regeneration
-- 🔒 Secure environment variable handling
+## 📝 Environment Variables
+- `VITE_FAL_API_KEY`: Your FAL.ai API key (required)
 
-## Project Structure
+## 🔒 Security
+- API keys are properly secured
+- Environment variables for sensitive data
+- No client-side key exposure
 
-```
-/
-├── src/
-│   ├── components/         # React components
-│   │   ├── ImageLoadingPlaceholder.tsx
-│   │   ├── StoryboardPrompt.tsx
-│   │   └── StoryboardSequence.tsx
-│   ├── utils/
-│   │   └── falAi.ts       # FAL.ai integration
-│   ├── App.tsx            # Main app component
-│   └── main.tsx           # Entry point
-├── public/                 # Static assets
-├── .env.example           # Environment variables template
-└── package.json           # Dependencies and scripts
-```
+## 🤝 Contributing
+Feel free to open issues and pull requests!
 
-## Deployment
-
-To deploy your app:
-
-1. Build your application:
-   ```bash
-   npm run build
-   ```
-
-2. Preview the build:
-   ```bash
-   npm run preview
-   ```
-
-3. Deploy the `dist` folder to your hosting provider
-
-## Type Support For `.env` Files
-
-This project includes type support for environment variables through `vite-env.d.ts`. You can find more details in Vite's documentation.
+## 📄 License
+MIT License - see LICENSE file for details
