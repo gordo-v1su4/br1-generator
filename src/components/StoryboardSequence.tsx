@@ -20,6 +20,7 @@ interface Sequence {
 
 interface StoryboardSequenceProps {
   sequence: Sequence;
+  onUpdateSequence: (sequence: Sequence) => void;
   onRegenerateImage: (index: number, prompt: string, seed?: number, expandedPrompt?: string) => void;
   onGenerateKling: (index: number, duration: 5 | 10) => void;
   onUpdateAudio: (audioUrl: string, index: number) => void;
@@ -33,7 +34,7 @@ interface StoryboardSequenceProps {
   selectedModel: ModelType;
 }
 
-export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKling, onUpdateAudio, onClear, onUpdatePrompt, onUpdateNarrative, onUpdateDialogue, onCompose, onComposeVideo, regeneratingIndices, selectedModel }: StoryboardSequenceProps) {
+export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateImage, onGenerateKling, onUpdateAudio, onClear, onUpdatePrompt, onUpdateNarrative, onUpdateDialogue, onCompose, onComposeVideo, regeneratingIndices, selectedModel }: StoryboardSequenceProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState(sequence.prompt);
   const [editedNarrative, setEditedNarrative] = useState(sequence.narrative);
@@ -42,6 +43,7 @@ export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKlin
   const [editedPrompts, setEditedPrompts] = useState<string[]>(sequence.expandedPrompts || Array(sequence.images.length).fill(''));
   const [selectedLanguage, setSelectedLanguage] = useState<TTSLanguage>('american-english');
   const [selectedVoice, setSelectedVoice] = useState<TTSVoice>('af_nova');
+  const [regeneratingIndicesState, setRegeneratingIndicesState] = useState(new Set<number>());
 
   useEffect(() => {
     const voices = voicesByLanguage[selectedLanguage];
@@ -50,13 +52,20 @@ export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKlin
     }
   }, [selectedLanguage]);
 
-  const handleRegenerateImage = (index: number) => {
-    onRegenerateImage(
-      index, 
-      editedPrompts[index] || sequence.dialogues[index],
-      sequence.imageSeeds?.[index],
-      sequence.expandedPrompts?.[index]
-    );
+  const handleRegenerateImage = async (index: number) => {
+    if (regeneratingIndicesState.has(index)) return;
+    
+    try {
+      onRegenerateImage(
+        index, 
+        editedPrompts[index] || sequence.dialogues[index],
+        sequence.imageSeeds?.[index],
+        sequence.expandedPrompts?.[index]
+      );
+      setRegeneratingIndicesState((prev) => new Set(prev).add(index));
+    } catch (error) {
+      console.error('Failed to regenerate image:', error);
+    }
   };
 
   return (
@@ -190,17 +199,17 @@ export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKlin
               <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-700">
                 <img src={image} alt={`Generated ${index + 1}`} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  {regeneratingIndices.has(index) && (
+                  {regeneratingIndicesState.has(index) && (
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                   )}
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 backdrop-blur-sm flex gap-2">
                   <button
                     onClick={() => handleRegenerateImage(index)}
-                    className="p-1 hover:bg-white/20 rounded"
-                    title="Regenerate image"
+                    disabled={regeneratingIndicesState.has(index)}
+                    className="p-1 bg-gray-800/80 hover:bg-gray-700/80 rounded"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className={`w-4 h-4 ${regeneratingIndicesState.has(index) ? 'animate-spin' : ''}`} />
                   </button>
                   <button
                     onClick={() => onGenerateKling(index, 5)}

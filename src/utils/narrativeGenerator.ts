@@ -62,7 +62,7 @@ export async function generateNarrative(prompt: string): Promise<NarrativeResult
 
       return {
         narrative: result.narrative,
-        imagePrompts: result.imagePrompts.map(prompt => 
+        imagePrompts: result.imagePrompts.map((prompt: string) => 
           `${prompt}, 9:16 aspect ratio, cinematic lighting, high quality, detailed, photorealistic`
         ),
         dialogues: Array(5).fill('') // Initialize with empty dialogues
@@ -102,7 +102,7 @@ export async function generateStoryPrompts(prompt: string): Promise<string[]> {
   });
 
   const scenes = completion.choices[0].message.content?.split(/Scene \d+: /).filter(Boolean) || [];
-  return scenes.map(scene => scene.trim());
+  return scenes.map((scene: string) => scene.trim());
 }
 
 export async function generateExpandedPrompts(basePrompt: string, narrative: string, count: number): Promise<string[]> {
