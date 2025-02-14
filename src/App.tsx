@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StoryboardPrompt } from './components/StoryboardPrompt';
 import { StoryboardSequence } from './components/StoryboardSequence';
 import { ModelSelector } from './components/ModelSelector';
@@ -9,6 +9,7 @@ interface Sequence {
   id: string;
   prompt: string;
   images: string[];
+  audioUrls: string[];
 }
 
 function App() {
@@ -22,9 +23,10 @@ function App() {
     try {
       const images = await generateImages(prompt, selectedModel);
       const newSequence: Sequence = {
-        id: Date.now().toString(),
+        id: window.crypto.randomUUID(),
         prompt,
         images,
+        audioUrls: new Array(images.length).fill('') // Initialize with empty strings for each image
       };
       setSequences([newSequence, ...sequences]);
     } catch (error) {
@@ -109,6 +111,20 @@ function App() {
     }
   };
 
+  const handleUpdateAudio = (sequenceId: string, imageIndex: number, audioUrl: string) => {
+    setSequences(sequences.map(sequence => {
+      if (sequence.id === sequenceId) {
+        const newAudioUrls = [...sequence.audioUrls];
+        newAudioUrls[imageIndex] = audioUrl;
+        return {
+          ...sequence,
+          audioUrls: newAudioUrls
+        };
+      }
+      return sequence;
+    }));
+  };
+
   const handleClearSequence = (id: string) => {
     setSequences(sequences.filter(seq => seq.id !== id));
   };
@@ -138,6 +154,7 @@ function App() {
                 sequence={sequence}
                 onRegenerateImage={(imageIndex) => handleRegenerateImage(sequence.id, imageIndex)}
                 onGenerateKling={(index, duration) => handleGenerateKling(sequence.id, index, duration)}
+                onUpdateAudio={(index, audioUrl) => handleUpdateAudio(sequence.id, index, audioUrl)}
                 onClear={() => handleClearSequence(sequence.id)}
                 onUpdatePrompt={(prompt) => handleUpdatePrompt(sequence.id, prompt)}
                 regeneratingIndices={regeneratingIndices}
