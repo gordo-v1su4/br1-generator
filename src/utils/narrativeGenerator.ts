@@ -82,6 +82,29 @@ export async function generateNarrative(prompt: string): Promise<NarrativeResult
   return request;
 }
 
+export async function generateStoryPrompts(prompt: string): Promise<string[]> {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4-turbo-preview",
+    messages: [
+      {
+        role: "system",
+        content: `You are a creative storyteller and visual designer. Create a 5-scene narrative that tells a compelling story. 
+          For each scene, write a concise one-sentence description focused on the visual elements, followed by expanded details for image generation.
+          Keep the initial description under 20 words. Make it dynamic and visual.
+          The expanded details should include artistic style, mood, lighting, and composition in 9:16 vertical format.`
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    temperature: 0.7,
+  });
+
+  const scenes = completion.choices[0].message.content?.split(/Scene \d+: /).filter(Boolean) || [];
+  return scenes.map(scene => scene.trim());
+}
+
 export async function generateExpandedPrompts(basePrompt: string, narrative: string, count: number): Promise<string[]> {
   try {
     const response = await openai.chat.completions.create({

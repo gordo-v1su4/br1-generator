@@ -214,22 +214,23 @@ export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKlin
               <div className="relative">
                 {editingDialogueIndex === index ? (
                   <div className="space-y-2">
-                    <div className="min-h-[3rem] px-3 py-2 text-sm bg-gray-700 rounded">
+                    <div className="h-32 overflow-hidden px-3 py-2 text-xs bg-gray-700 rounded">
                       <div className="font-medium mb-1">Prompt:</div>
-                      <div className="text-gray-300 text-sm">{editedPrompts[index]}</div>
+                      <div className="text-gray-300 text-xs line-clamp-4">
+                        {editedPrompts[index].split('.')[0]}
+                      </div>
                     </div>
-                    <div className="min-h-[4rem] px-3 py-2 text-sm bg-gray-700/50 rounded">
+                    <div className="h-16 px-3 py-2 text-xs bg-gray-700/50 rounded">
                       <div className="font-medium mb-1">Dialogue:</div>
                       <textarea
                         value={sequence.dialogues[index] || ''}
                         onChange={(e) => {
-                          // Limit dialogue to roughly what can be spoken in 5 seconds
                           const text = e.target.value;
-                          if (text.split(' ').length <= 15) { // Average person speaks ~3 words/second
+                          if (text.split(' ').length <= 15) {
                             onUpdateDialogue(index, text);
                           }
                         }}
-                        className="w-full h-12 bg-transparent resize-none focus:outline-none"
+                        className="w-full h-8 bg-transparent resize-none focus:outline-none text-xs"
                         placeholder="Enter a short dialogue (max 15 words)..."
                       />
                     </div>
@@ -245,13 +246,17 @@ export function StoryboardSequence({ sequence, onRegenerateImage, onGenerateKlin
                     onClick={() => setEditingDialogueIndex(index)}
                     className="space-y-2"
                   >
-                    <div className="min-h-[3rem] px-3 py-2 text-sm bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
+                    <div className="h-32 overflow-hidden px-3 py-2 text-xs bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
                       <div className="font-medium mb-1">Prompt:</div>
-                      <div className="text-gray-300 text-sm">{editedPrompts[index]}</div>
+                      <div className="text-gray-300 text-xs line-clamp-4">
+                        {editedPrompts[index].split('.')[0]}
+                      </div>
                     </div>
-                    <div className="min-h-[4rem] px-3 py-2 text-sm bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
+                    <div className="h-16 px-3 py-2 text-xs bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
                       <div className="font-medium mb-1">Dialogue:</div>
-                      <div className="text-gray-300 text-sm">{sequence.dialogues[index] || ''}</div>
+                      <div className="text-gray-300 text-xs line-clamp-2">
+                        {sequence.dialogues[index] || ''}
+                      </div>
                     </div>
                     <TTSPanel
                       text={sequence.dialogues[index] || ''}
