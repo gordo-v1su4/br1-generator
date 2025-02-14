@@ -20,6 +20,7 @@ interface StoryboardSequenceProps {
   onUpdateAudio: (audioUrl: string) => void;
   onClear: () => void;
   onUpdatePrompt: (prompt: string) => void;
+  onCompose: () => Promise<string | undefined>;
   onComposeVideo: () => void;
   regeneratingIndices?: Set<number>;
   selectedModel: ModelType;
@@ -32,6 +33,8 @@ export const StoryboardSequence: React.FC<StoryboardSequenceProps> = ({
   onUpdateAudio,
   onClear,
   onUpdatePrompt,
+  onCompose,
+  onComposeVideo,
   regeneratingIndices = new Set(),
   selectedModel
 }) => {
@@ -85,6 +88,20 @@ export const StoryboardSequence: React.FC<StoryboardSequenceProps> = ({
             <Trash2 className="w-5 h-5" />
             Clear
           </button>
+          {sequence.videoUrls && sequence.videoUrls.some(url => url !== null) && (
+            <button
+              onClick={async () => {
+                const composedUrl = await onCompose();
+                if (composedUrl) {
+                  window.open(composedUrl, '_blank');
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg"
+            >
+              <Play className="w-5 h-5" />
+              Compose Video
+            </button>
+          )}
         </div>
       </div>
 
@@ -165,7 +182,7 @@ export const StoryboardSequence: React.FC<StoryboardSequenceProps> = ({
           <TTSPanel onAudioGenerated={onUpdateAudio} initialAudioUrl={sequence.audioUrl} />
           {sequence.videoUrls?.some(url => url) && sequence.audioUrl && (
             <button
-              onClick={props.onComposeVideo}
+              onClick={onComposeVideo}
               className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2"
             >
               <Film className="w-5 h-5" />

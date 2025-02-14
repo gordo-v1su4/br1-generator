@@ -208,6 +208,7 @@ function App() {
                 onUpdateAudio={(audioUrl) => handleUpdateAudio(sequence.id, audioUrl)}
                 onClear={() => handleClearSequence(sequence.id)}
                 onUpdatePrompt={(prompt) => handleUpdatePrompt(sequence.id, prompt)}
+                onCompose={() => handleComposeVideo(sequence.id)}
                 onComposeVideo={() => handleComposeVideo(sequence.id)}
                 regeneratingIndices={regeneratingIndices}
                 selectedModel={selectedModel}
