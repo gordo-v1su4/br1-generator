@@ -112,13 +112,18 @@ function App() {
     if (!activeSequence) return;
     
     try {
-      const videoUrl = await generateKlingVideo(activeSequence.images[index], duration);
+      const videoResult = await generateKlingVideo(
+        activeSequence.dialogues[index] || activeSequence.prompt,
+        activeSequence.images[index],
+        duration
+      );
+      
       setSequences(prevSequences => {
         return prevSequences.map(seq => {
           if (seq.id === activeSequence.id) {
             const newVideoUrls = [...(seq.videoUrls || Array(seq.images.length).fill(null))];
             const newDurations = [...(seq.videoDurations || Array(seq.images.length).fill(5))];
-            newVideoUrls[index] = videoUrl;
+            newVideoUrls[index] = videoResult.video.url;
             newDurations[index] = duration;
             
             return {

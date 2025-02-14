@@ -1,19 +1,11 @@
 import { fal } from "@fal-ai/client";
 
 type DurationEnum = "5" | "10";
-type AspectRatioEnum = "16:9" | "9:16" | "1:1";
 type QueueStatus = "IN_PROGRESS" | "COMPLETED" | "IN_QUEUE" | "FAILED";
 
 interface QueueUpdate {
   status: QueueStatus;
   logs?: Array<{ message: string }>;
-}
-
-export interface KlingGenerationConfig {
-  prompt: string;
-  image_url: string;
-  duration: DurationEnum;
-  aspect_ratio?: AspectRatioEnum;
 }
 
 interface KlingFile {
@@ -23,9 +15,11 @@ interface KlingFile {
   content_type?: string;
 }
 
-export interface KlingGenerationResult {
+interface KlingApiResponse {
   video: KlingFile;
 }
+
+export interface KlingGenerationResult extends KlingApiResponse {}
 
 export const generateKlingVideo = async (
   prompt: string,
