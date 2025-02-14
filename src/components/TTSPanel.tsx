@@ -40,7 +40,26 @@ export function TTSPanel({ onAudioGenerated, initialAudioUrl, text = '', voice =
   return (
     <div className="flex items-center gap-2">
       {audioUrl ? (
-        <audio src={audioUrl} controls className="w-full h-6" />
+        <div className="flex items-center gap-2 w-full">
+          <audio src={audioUrl} controls className="flex-1 h-6" />
+          <button
+            onClick={handleGenerateTTS}
+            disabled={isGenerating || !text}
+            className="flex items-center gap-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Regenerating...</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3" />
+                <span>Regenerate</span>
+              </>
+            )}
+          </button>
+        </div>
       ) : (
         <button
           onClick={handleGenerateTTS}

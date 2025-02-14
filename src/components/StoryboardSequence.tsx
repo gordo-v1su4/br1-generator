@@ -229,7 +229,7 @@ export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateIma
                         {editedPrompts[index].split('.')[0]}
                       </div>
                     </div>
-                    <div className="h-16 px-3 py-2 text-xs bg-gray-700/50 rounded">
+                    <div className="h-24 px-3 py-2 text-xs bg-gray-700/50 rounded">
                       <div className="font-medium mb-1">Dialogue:</div>
                       <textarea
                         value={sequence.dialogues[index] || ''}
@@ -239,7 +239,7 @@ export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateIma
                             onUpdateDialogue(index, text);
                           }
                         }}
-                        className="w-full h-8 bg-transparent resize-none focus:outline-none text-xs"
+                        className="w-full h-16 bg-transparent resize-none focus:outline-none text-xs"
                         placeholder="Enter a short dialogue (max 15 words)..."
                       />
                     </div>
@@ -261,9 +261,9 @@ export function StoryboardSequence({ sequence, onUpdateSequence, onRegenerateIma
                         {editedPrompts[index].split('.')[0]}
                       </div>
                     </div>
-                    <div className="h-16 px-3 py-2 text-xs bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
+                    <div className="h-24 px-3 py-2 text-xs bg-gray-700/50 rounded cursor-text hover:bg-gray-700/70">
                       <div className="font-medium mb-1">Dialogue:</div>
-                      <div className="text-gray-300 text-xs line-clamp-2">
+                      <div className="text-gray-300 text-xs line-clamp-3">
                         {sequence.dialogues[index] || ''}
                       </div>
                     </div>

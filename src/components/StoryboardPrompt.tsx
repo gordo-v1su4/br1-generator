@@ -26,7 +26,7 @@ export const StoryboardPrompt: React.FC<StoryboardPromptProps> = ({ onGenerate, 
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe your scene..."
-            className="w-full h-12 px-4 py-2 text-gray-200 bg-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className="w-full h-12 px-4 py-2 text-gray-200 bg-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none overflow-x-hidden"
             disabled={isLoading || isGenerating}
           />
           {isGenerating && (
