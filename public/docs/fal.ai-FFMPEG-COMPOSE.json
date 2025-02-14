@@ -1,0 +1,310 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Fal Queue API",
+    "version": "1.0.0",
+    "description": "The Fal Queue API."
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Fal Key"
+      }
+    },
+    "schemas": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_QUEUE",
+              "IN_PROGRESS",
+              "COMPLETED"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The request id."
+          },
+          "response_url": {
+            "type": "string",
+            "description": "The response url."
+          },
+          "status_url": {
+            "type": "string",
+            "description": "The status url."
+          },
+          "cancel_url": {
+            "type": "string",
+            "description": "The cancel url."
+          },
+          "logs": {
+            "type": "object",
+            "description": "The logs.",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "description": "The metrics.",
+            "additionalProperties": true
+          },
+          "queue_position": {
+            "type": "integer",
+            "description": "The queue position."
+          }
+        },
+        "required": [
+          "status",
+          "request_id"
+        ]
+      },
+      "FfmpegApiComposeInput": {
+        "title": "Input",
+        "type": "object",
+        "properties": {
+          "tracks": {
+            "title": "Tracks",
+            "type": "array",
+            "description": "List of tracks to be combined into the final media",
+            "items": {
+              "$ref": "#/components/schemas/Track"
+            }
+          }
+        },
+        "x-fal-order-properties": [
+          "tracks"
+        ],
+        "required": [
+          "tracks"
+        ]
+      },
+      "FfmpegApiComposeOutput": {
+        "title": "Output",
+        "type": "object",
+        "properties": {
+          "video_url": {
+            "title": "Video Url",
+            "type": "string",
+            "description": "URL of the processed video file"
+          },
+          "thumbnail_url": {
+            "title": "Thumbnail Url",
+            "type": "string",
+            "description": "URL of the video's thumbnail image"
+          }
+        },
+        "x-fal-order-properties": [
+          "video_url",
+          "thumbnail_url"
+        ],
+        "required": [
+          "video_url",
+          "thumbnail_url"
+        ]
+      },
+      "Track": {
+        "title": "Track",
+        "type": "object",
+        "properties": {
+          "type": {
+            "title": "Type",
+            "type": "string",
+            "description": "Type of track ('video' or 'audio')"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string",
+            "description": "Unique identifier for the track"
+          },
+          "keyframes": {
+            "title": "Keyframes",
+            "type": "array",
+            "description": "List of keyframes that make up this track",
+            "items": {
+              "$ref": "#/components/schemas/Keyframe"
+            }
+          }
+        },
+        "x-fal-order-properties": [
+          "id",
+          "type",
+          "keyframes"
+        ],
+        "required": [
+          "id",
+          "type",
+          "keyframes"
+        ]
+      },
+      "Keyframe": {
+        "title": "Keyframe",
+        "type": "object",
+        "properties": {
+          "duration": {
+            "title": "Duration",
+            "type": "number",
+            "description": "The duration in milliseconds of this keyframe"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "number",
+            "description": "The timestamp in milliseconds where this keyframe starts"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string",
+            "description": "The URL where this keyframe's media file can be accessed"
+          }
+        },
+        "x-fal-order-properties": [
+          "timestamp",
+          "duration",
+          "url"
+        ],
+        "required": [
+          "timestamp",
+          "duration",
+          "url"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/fal-ai/ffmpeg-api/compose/requests/{request_id}/status": {
+      "get": {
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Request ID"
+            }
+          },
+          {
+            "name": "logs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "description": "Whether to include logs (`1`) in the response or not (`0`)."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fal-ai/ffmpeg-api/compose/requests/{request_id}/cancel": {
+      "put": {
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Request ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request was cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Whether the request was cancelled successfully."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fal-ai/ffmpeg-api/compose": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FfmpegApiComposeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fal-ai/ffmpeg-api/compose/requests/{request_id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Request ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result of the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FfmpegApiComposeOutput"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://queue.fal.run"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyAuth": []
+    }
+  ]
+}

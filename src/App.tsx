@@ -4,12 +4,16 @@ import { StoryboardSequence } from './components/StoryboardSequence';
 import { ModelSelector } from './components/ModelSelector';
 import { generateImages, generateSingleImage, ModelType } from './utils/falAi';
 import { generateKlingVideo } from './utils/klingVideo';
+import { composeVideoWithAudio } from './utils/ffmpegCompose';
 
 interface Sequence {
   id: string;
   prompt: string;
   images: string[];
-  audioUrls: string[];
+  audioUrl?: string;
+  videoUrls?: string[];
+  videoDurations?: (5 | 10)[];
+  composedVideoUrl?: string;
 }
 
 function App() {
@@ -26,7 +30,7 @@ function App() {
         id: window.crypto.randomUUID(),
         prompt,
         images,
-        audioUrls: new Array(images.length).fill('') // Initialize with empty strings for each image
+        audioUrl: ''
       };
       setSequences([newSequence, ...sequences]);
     } catch (error) {
@@ -67,62 +71,56 @@ function App() {
   };
 
   const handleGenerateKling = async (sequenceId: string, index: number, duration: 5 | 10) => {
-    // Add image index to regenerating set
     setRegeneratingIndices(prev => new Set(prev).add(index));
 
     try {
       const sequence = sequences.find(seq => seq.id === sequenceId);
       if (!sequence) throw new Error('Sequence not found');
+      if (!sequence.images[index]) throw new Error('No image found at index');
 
-      const imageUrl = sequence.images[index];
-      if (!imageUrl) throw new Error('Image not found');
-
-      const result = await generateKlingVideo({
-        prompt: sequence.prompt,
-        imageData: imageUrl,
-        duration: duration.toString() as "5" | "10", // Duration comes directly from button click (5 or 10)
-      }, (update) => {
-        if (update.status === "IN_PROGRESS") {
-          console.log("Kling generation progress:", update);
-        }
-      });
-
-      // Replace the image with the video URL in the sequence
+      const result = await generateKlingVideo(
+        sequence.prompt,
+        sequence.images[index],
+        duration
+      );
+      
       setSequences(prevSequences => {
         return prevSequences.map(seq => {
           if (seq.id === sequenceId) {
-            const newImages = [...seq.images];
-            newImages[index] = result.video.url;
-            return { ...seq, images: newImages };
+            const newVideoUrls = [...(seq.videoUrls || Array(seq.images.length).fill(null))];
+            const newDurations = [...(seq.videoDurations || Array(seq.images.length).fill(5))];
+            newVideoUrls[index] = result.video.url;
+            newDurations[index] = duration;
+            
+            return {
+              ...seq,
+              videoUrls: newVideoUrls,
+              videoDurations: newDurations
+            };
           }
           return seq;
         });
       });
-      
     } catch (error) {
-      console.error('Error generating Kling:', error);
+      console.error('Error generating video:', error);
+      alert('Failed to generate video. Please try again.');
     } finally {
-      // Remove image index from regenerating set
       setRegeneratingIndices(prev => {
-        const next = new Set(prev);
-        next.delete(index);
-        return next;
+        const newSet = new Set(prev);
+        newSet.delete(index);
+        return newSet;
       });
     }
   };
 
-  const handleUpdateAudio = (sequenceId: string, imageIndex: number, audioUrl: string) => {
-    setSequences(sequences.map(sequence => {
-      if (sequence.id === sequenceId) {
-        const newAudioUrls = [...sequence.audioUrls];
-        newAudioUrls[imageIndex] = audioUrl;
-        return {
-          ...sequence,
-          audioUrls: newAudioUrls
-        };
-      }
-      return sequence;
-    }));
+  const handleUpdateAudio = (sequenceId: string, audioUrl: string) => {
+    setSequences(prevSequences =>
+      prevSequences.map(seq =>
+        seq.id === sequenceId
+          ? { ...seq, audioUrl }
+          : seq
+      )
+    );
   };
 
   const handleClearSequence = (id: string) => {
@@ -140,6 +138,59 @@ function App() {
     );
   };
 
+  const handleComposeVideo = async (sequenceId: string): Promise<string | undefined> => {
+    try {
+      const sequence = sequences.find(seq => seq.id === sequenceId);
+      if (!sequence) throw new Error('Sequence not found');
+      if (!sequence.videoUrls) throw new Error('No video to compose');
+      if (!sequence.audioUrl) throw new Error('No audio to compose with');
+      if (!sequence.videoDurations) throw new Error('No video duration specified');
+
+      // Get the first valid video URL and its duration
+      const videoIndex = sequence.videoUrls.findIndex(url => url !== null);
+      if (videoIndex === -1) throw new Error('No valid video found');
+
+      const videoUrl = sequence.videoUrls[videoIndex];
+      const duration = sequence.videoDurations[videoIndex];
+
+      // Compose video with audio
+      const composedVideoUrl = await composeVideoWithAudio({
+        videoUrl,
+        audioUrl: sequence.audioUrl,
+        duration
+      });
+
+      // Update the sequence with the composed video URL
+      setSequences(prevSequences =>
+        prevSequences.map(seq =>
+          seq.id === sequenceId
+            ? { ...seq, composedVideoUrl }
+            : seq
+        )
+      );
+
+      // Create a video element to replace the image
+      const videoElement = document.createElement('video');
+      videoElement.src = composedVideoUrl;
+      videoElement.autoplay = true;
+      videoElement.loop = true;
+      videoElement.muted = true;
+      videoElement.className = 'w-full h-full object-cover rounded-lg';
+
+      // Replace the image with the video
+      const imageElement = document.querySelector(`[data-frame-index="${videoIndex}"] img`);
+      if (imageElement && imageElement.parentNode) {
+        imageElement.parentNode.replaceChild(videoElement, imageElement);
+      }
+
+      return composedVideoUrl;
+    } catch (error) {
+      console.error('Error composing video:', error);
+      alert('Failed to compose video. Please try again.');
+      return undefined;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-300">
       <div className="max-w-[1400px] mx-auto p-8">
@@ -154,9 +205,10 @@ function App() {
                 sequence={sequence}
                 onRegenerateImage={(imageIndex) => handleRegenerateImage(sequence.id, imageIndex)}
                 onGenerateKling={(index, duration) => handleGenerateKling(sequence.id, index, duration)}
-                onUpdateAudio={(index, audioUrl) => handleUpdateAudio(sequence.id, index, audioUrl)}
+                onUpdateAudio={(audioUrl) => handleUpdateAudio(sequence.id, audioUrl)}
                 onClear={() => handleClearSequence(sequence.id)}
                 onUpdatePrompt={(prompt) => handleUpdatePrompt(sequence.id, prompt)}
+                onComposeVideo={() => handleComposeVideo(sequence.id)}
                 regeneratingIndices={regeneratingIndices}
                 selectedModel={selectedModel}
               />
